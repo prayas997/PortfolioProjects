@@ -1,0 +1,119 @@
+select * from MyProject..CovidDeaths
+where continent is not null
+order by 3 desc,4
+
+-- select * from MyProject.dbo.CovidVaccinations
+-- order by 3,4
+
+select Location, date, total_cases, new_cases, total_deaths, population
+from MyProject..CovidDeaths
+order by 1,2
+
+---total cases vs total deaths
+select Location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 as death_percentage
+from MyProject..CovidDeaths
+where location like '%states%'
+order by 1,2
+
+---total cases vs population
+select Location, date, total_cases,Population, (total_cases/population)*100 as death_percentage
+from MyProject..CovidDeaths
+---where location like '%states%'
+order by 1,2
+
+---countries with Highest Infection Rate Compared to Population
+select Location, Population, max(total_cases) as HighestInfectionCount, max((total_cases/population))*100 as PercentPopulatoinInfected
+from MyProject..CovidDeaths
+where continent is not null
+group by Location, Population
+order by PercentPopulatoinInfected desc
+
+
+---countries with Highest Death Count per Population
+select Location, max(total_deaths) as TotalDeathCount
+from MyProject..CovidDeaths
+where continent is not null
+group by Location
+order by TotalDeathCount desc
+
+---continents with highest death count per Population
+select continent, max(total_deaths) as TotalDeathCount
+from MyProject..CovidDeaths
+where continent is not null
+group by continent
+order by TotalDeathCount desc
+
+--Global Numbers
+select date, sum(new_cases) total_cases, sum(new_deaths) total_deaths, (sum(new_deaths)/sum(new_cases) * 100) as death_percentage
+from MyProject..CovidDeaths
+where continent is not null
+group by date
+order by 1,2
+
+---total numbers
+select sum(new_cases) as TotalCases, sum(new_deaths) as TotalDeaths, (sum(new_deaths)/sum(new_cases) * 100) as DeathPercentage
+from MyProject..CovidDeaths
+where continent is not null
+
+
+---Total Populations vs Vaccinations
+select cd.continent, cd.location, cd.date, cd.population,
+cv.new_vaccinations,
+sum(cv.new_vaccinations) over(partition by cv.location order by cv.location, cv.date) as RollingPeopleVaccinated
+from MyProject..CovidDeaths cd
+join MyProject..CovidVaccinations cv
+on cd.location = cv.location 
+and cd.date = cv.date 
+where cd.continent is not null
+order by 2,3
+
+---CTE
+with PopvsVac as
+(
+select cd.continent, cd.location, cd.date, cd.population,
+cv.new_vaccinations,
+sum(cv.new_vaccinations) over(partition by cv.location order by cv.location, cv.date) as RollingPeopleVaccinated
+from MyProject..CovidDeaths cd
+join MyProject..CovidVaccinations cv
+on cd.location = cv.location 
+and cd.date = cv.date 
+where cd.continent is not null
+)
+select *, (RollingPeopleVaccinated/population)*100
+from PopvsVac
+
+--- Temp Table
+Drop table if exists #PercentPopulationVaccinated
+CREATE TABLE #PercentPopulationVaccinated
+(
+  continent NVARCHAR(255),
+  location NVARCHAR(255),
+  date datetime,
+  population numeric,
+  new_vaccinations numeric,
+  RollingPeopleVaccinated numeric
+)
+Insert into #PercentPopulationVaccinated
+select cd.continent, cd.location, cd.date, cd.population,
+cv.new_vaccinations,
+sum(cv.new_vaccinations) over(partition by cv.location order by cv.location, cv.date) as RollingPeopleVaccinated
+from MyProject..CovidDeaths cd
+join MyProject..CovidVaccinations cv
+on cd.location = cv.location 
+and cd.date = cv.date 
+where cd.continent is not null
+select *, (RollingPeopleVaccinated/population)*100
+from #PercentPopulationVaccinated
+
+--views for data visualizations
+create view PercentPopulationVaccinated as
+select cd.continent, cd.location, cd.date, cd.population,
+cv.new_vaccinations,
+sum(cv.new_vaccinations) over(partition by cv.location order by cv.location, cv.date) as RollingPeopleVaccinated
+from MyProject..CovidDeaths cd
+join MyProject..CovidVaccinations cv
+on cd.location = cv.location 
+and cd.date = cv.date 
+where cd.continent is not null
+
+select * from PercentPopulationVaccinated
